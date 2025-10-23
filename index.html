@@ -1,0 +1,1296 @@
+<html lang="zh-CN"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jerry - AI助手</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GSAP 动画库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+    <!-- ScrollTrigger 插件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/ScrollTrigger.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#e6f1fe',
+                            100: '#cce3fd',
+                            200: '#99c7fb',
+                            300: '#66abf9',
+                            400: '#338ff7',
+                            500: '#0073f5',
+                            600: '#005cc4',
+                            700: '#004593',
+                            800: '#002e62',
+                            900: '#001731',
+                        },
+                        secondary: {
+                            50: '#e6f9ff',
+                            100: '#ccf3ff',
+                            200: '#99e7ff',
+                            300: '#66dbff',
+                            400: '#33cfff',
+                            500: '#00c3ff',
+                            600: '#009ccc',
+                            700: '#007599',
+                            800: '#004e66',
+                            900: '#002733',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans SC', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #0a192f 0%, #172a46 100%);
+        }
+
+        .text-gradient {
+            background: linear-gradient(90deg, #00c3ff, #0073f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        #three-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: -1;
+        }
+
+        .chat-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .chat-message {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #0073f5;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            opacity: 0.6;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+
+        .typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0.6);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        /* 响应式导航菜单 */
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .mobile-menu.active {
+            transform: translateX(0);
+        }
+
+        /* 滚动显示动画 */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 3D模型容器 */
+        .model-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-md fixed w-full z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="#" class="flex-shrink-0 flex items-center">
+                        <i class="fas fa-cube text-primary-500 text-2xl mr-2"></i>
+                        <span class="text-xl font-bold text-gray-800">Jerry</span>
+                    </a>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="text-gray-600 hover:text-primary-500 px-3 py-2 text-sm font-medium transition-colors duration-200">首页</a>
+                    <a href="#features" class="text-gray-600 hover:text-primary-500 px-3 py-2 text-sm font-medium transition-colors duration-200">功能</a>
+                    <a href="#ai-assistant" class="text-gray-600 hover:text-primary-500 px-3 py-2 text-sm font-medium transition-colors duration-200">AI助手</a>
+                    <a href="#about" class="text-gray-600 hover:text-primary-500 px-3 py-2 text-sm font-medium transition-colors duration-200">关于我们</a>
+                </div>
+                <div class="flex items-center md:hidden">
+                    <button id="mobile-menu-button" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- 移动端菜单 -->
+        <div id="mobile-menu" class="mobile-menu fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-40 md:hidden">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#home" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary-500 hover:bg-gray-50">首页</a>
+                <a href="#features" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary-500 hover:bg-gray-50">功能</a>
+                <a href="#ai-assistant" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary-500 hover:bg-gray-50">AI助手</a>
+                <a href="#about" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary-500 hover:bg-gray-50">关于我们</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 首屏区域 -->
+    <section id="home" class="relative h-screen flex items-center gradient-bg pt-16">
+        <!-- Three.js 背景 -->
+        <div id="three-container"></div>
+        
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center">
+                <div class="md:w-1/2 text-white mb-10 md:mb-0">
+                    <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
+                        <span class="text-gradient">Jerry</span>
+                    </h1>
+                    <h2 class="text-2xl md:text-3xl font-semibold mb-8">AI助手</h2>
+                    <p class="text-lg md:text-xl text-gray-300 mb-10">专业的BIM技术支持平台，提供建模、投标、审查、政策咨询和渲染等全方位服务，助力建筑信息模型化进程。</p>
+                    <div class="flex flex-wrap gap-4">
+                        <a href="#features" class="bg-primary-500 hover:bg-primary-600 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 flex items-center">
+                            <i class="fas fa-cube mr-2"></i> 了解功能
+                        </a>
+                        <a href="#ai-assistant" class="bg-transparent border-2 border-white text-white font-medium py-3 px-6 rounded-lg hover:bg-white hover:text-primary-500 transition-colors duration-200 flex items-center">
+                            <i class="fas fa-robot mr-2"></i> AI助手
+                        </a>
+                    </div>
+                </div>
+                <div class="md:w-1/2 animate-float">
+                    <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/7dedd225441045d1b60018be63d52951~tplv-a9rns2rl98-image.image?rcl=20251023092534F99FDEB137D7B08CAD3A&amp;rk3s=8e244e95&amp;rrcfp=f06b921b&amp;x-expires=1763774761&amp;x-signature=oQlUuXCXAEQaTNsD54D9c6dI3bU%3D" alt="数字孪生技术概念图" class="rounded-lg shadow-2xl w-full max-w-lg mx-auto">
+                </div>
+            </div>
+        </div>
+        
+        <!-- 向下滚动指示 -->
+        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-white animate-bounce">
+            <i class="fas fa-chevron-down text-2xl"></i>
+        </div>
+    </section>
+
+    <!-- 功能模块 -->
+    <section id="features" class="py-20 bg-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">BIM功能模块</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    我们提供全方位的BIM技术支持，从建模到渲染，从二次开发到审查，满足您的各种需求。
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- 建模助手 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 card-hover fade-in">
+                    <div class="w-16 h-16 bg-primary-50 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-cubes text-primary-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">建模助手</h3>
+                    <p class="text-gray-600 mb-6">
+                        提供专业的BIM建模指导，包括族库创建、参数化设计、模型优化等功能，提高建模效率和质量。
+                    </p>
+                    <button class="feature-detail-btn text-primary-500 hover:text-primary-600 font-medium flex items-center" data-feature="modeling">
+                        了解更多 <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <!-- 投标助手 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 card-hover fade-in" style="transition-delay: 0.1s;">
+                    <div class="w-16 h-16 bg-primary-50 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-file-contract text-primary-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">投标助手</h3>
+                    <p class="text-gray-600 mb-6">
+                        辅助编制BIM投标方案，提供模板库、案例分析、技术亮点挖掘等功能，提升投标竞争力。
+                    </p>
+                    <button class="feature-detail-btn text-primary-500 hover:text-primary-600 font-medium flex items-center" data-feature="bidding">
+                        了解更多 <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <!-- BIM审查 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 card-hover fade-in" style="transition-delay: 0.2s;">
+                    <div class="w-16 h-16 bg-primary-50 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-search text-primary-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">BIM审查</h3>
+                    <p class="text-gray-600 mb-6">
+                        提供模型质量检查、碰撞检测、规范符合性审查等功能，确保模型符合项目要求和行业标准。
+                    </p>
+                    <button class="feature-detail-btn text-primary-500 hover:text-primary-600 font-medium flex items-center" data-feature="review">
+                        了解更多 <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <!-- BIM政策 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 card-hover fade-in" style="transition-delay: 0.3s;">
+                    <div class="w-16 h-16 bg-primary-50 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-book text-primary-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">BIM政策</h3>
+                    <p class="text-gray-600 mb-6">
+                        收集整理最新的BIM政策法规、标准规范和行业动态，为项目决策提供政策依据和参考。
+                    </p>
+                    <button class="feature-detail-btn text-primary-500 hover:text-primary-600 font-medium flex items-center" data-feature="policy">
+                        了解更多 <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <!-- BIM渲染 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 card-hover fade-in" style="transition-delay: 0.4s;">
+                    <div class="w-16 h-16 bg-primary-50 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-image text-primary-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">BIM渲染</h3>
+                    <p class="text-gray-600 mb-6">
+                        提供高质量的BIM模型渲染服务，包括静态渲染、动画制作、VR/AR展示等，实现设计可视化。
+                    </p>
+                    <button class="feature-detail-btn text-primary-500 hover:text-primary-600 font-medium flex items-center" data-feature="rendering">
+                        了解更多 <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <!-- 数字孪生 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 card-hover fade-in" style="transition-delay: 0.5s;">
+                    <div class="w-16 h-16 bg-primary-50 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-cube text-primary-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">数字孪生</h3>
+                    <p class="text-gray-600 mb-6">
+                        将BIM模型与物联网、大数据、AI等技术结合，构建数字孪生体，实现建筑全生命周期管理。
+                    </p>
+                    <button class="feature-detail-btn text-primary-500 hover:text-primary-600 font-medium flex items-center" data-feature="twin">
+                        了解更多 <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 功能图标展示 -->
+            <div class="mt-20 text-center">
+                <h3 class="text-2xl font-semibold mb-10">功能图标集</h3>
+                <img src="https://p9-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/28645cf50d444f6285ff3bd9af8b0943~tplv-a9rns2rl98-image.image?rcl=20251023092534F99FDEB137D7B08CAD3A&amp;rk3s=8e244e95&amp;rrcfp=f06b921b&amp;x-expires=1763774778&amp;x-signature=V%2BYqSL2FPCf7LGWBrJ%2Fzp7PB9e4%3D" alt="BIM功能模块图标集" class="rounded-lg shadow-lg max-w-4xl mx-auto w-full">
+            </div>
+        </div>
+    </section>
+
+    <!-- 3D模型展示 -->
+    <section class="py-20 bg-gray-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">3D模型交互</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    通过Three.js实现的3D建筑模型交互展示，体验数字孪生技术的魅力。
+                </p>
+            </div>
+            
+            <div class="model-container bg-white shadow-lg mx-auto max-w-4xl">
+                <div id="model-canvas"></div>
+            </div>
+            
+            <div class="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-3 flex items-center">
+                        <i class="fas fa-mouse text-primary-500 mr-2"></i> 旋转视角
+                    </h3>
+                    <p class="text-gray-600">点击并拖动鼠标可以旋转3D模型，从不同角度查看建筑细节。</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-3 flex items-center">
+                        <i class="fas fa-search-plus text-primary-500 mr-2"></i> 缩放模型
+                    </h3>
+                    <p class="text-gray-600">使用鼠标滚轮或触控板手势可以放大或缩小模型，查看更多细节。</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-3 flex items-center">
+                        <i class="fas fa-hand-paper text-primary-500 mr-2"></i> 平移模型
+                    </h3>
+                    <p class="text-gray-600">按住Shift键并拖动鼠标可以平移整个模型，调整观察位置。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI助手 -->
+    <section id="ai-assistant" class="py-20 bg-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">BIMer的AI助手</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    智能AI助手，为您解答BIM相关问题，提供技术支持和专业建议。
+                </p>
+            </div>
+            
+            <div class="flex flex-col lg:flex-row gap-10 items-center">
+                <div class="lg:w-1/2">
+                    <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/f1a8e6cfaa314e2c92161502cc2fc48d~tplv-a9rns2rl98-image.image?rcl=20251023092534F99FDEB137D7B08CAD3A&amp;rk3s=8e244e95&amp;rrcfp=f06b921b&amp;x-expires=1763774770&amp;x-signature=w6AnInLK5DCneqhss7B5c1Vx3VA%3D" alt="AI助手界面" class="rounded-lg shadow-xl w-full max-w-lg mx-auto">
+                </div>
+                
+                <div class="lg:w-1/2">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                        <div class="flex items-center mb-6">
+                            <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white">
+                                <i class="fas fa-robot text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-xl font-semibold">BIM AI助手</h3>
+                                <p class="text-sm text-gray-500">在线，随时为您解答问题</p>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-container bg-gray-50 rounded-lg p-4 mb-4" id="chat-messages">
+                            <!-- 欢迎消息 -->
+                            <div class="flex mb-4 chat-message">
+                                <div class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                                    <i class="fas fa-robot text-sm"></i>
+                                </div>
+                                <div class="ml-3 bg-primary-500 text-white rounded-lg py-2 px-4 max-w-[80%]">
+                                    <p>您好！我是BIM AI助手，可以为您解答关于数字孪生、BIM技术的问题。请问有什么可以帮助您的？</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex">
+                            <input type="text" id="chat-input" placeholder="输入您的问题..." class="flex-1 border border-gray-300 rounded-l-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <button id="send-message" class="bg-primary-500 hover:bg-primary-600 text-white font-medium py-3 px-6 rounded-r-lg transition-colors duration-200">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <p class="text-sm text-gray-500 mb-2">常见问题：</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="quick-question bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full transition-colors duration-200">
+                                    什么是数字孪生？
+                                </button>
+                                <button class="quick-question bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full transition-colors duration-200">
+                                    BIM技术有哪些应用？
+                                </button>
+                                <button class="quick-question bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full transition-colors duration-200">
+                                    如何提高建模效率？
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 关于我们 -->
+    <section id="about" class="py-20 bg-gray-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">关于我们</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    我们致力于为BIM从业者提供专业的技术支持和智能解决方案，推动建筑行业数字化转型。
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                <div>
+                    <h3 class="text-2xl font-semibold mb-6">我们的使命</h3>
+                    <p class="text-gray-600 mb-6">
+                        通过数字孪生和AI技术，为建筑行业提供智能化解决方案，提高工作效率，降低成本，推动行业数字化转型。
+                    </p>
+                    
+                    <h3 class="text-2xl font-semibold mb-6">我们的优势</h3>
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-600">专业的BIM技术团队，拥有丰富的行业经验</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-600">先进的AI技术，提供智能化的解决方案</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-600">全方位的服务体系，满足不同客户的需求</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-600">持续创新，不断探索前沿技术应用</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-8">
+                    <h3 class="text-2xl font-semibold mb-6">联系我们</h3>
+                    <form id="contact-form" class="space-y-6">
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                            <input type="text" id="name" name="name" class="w-full border border-gray-300 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+                            <input type="email" id="email" name="email" class="w-full border border-gray-300 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label for="message" class="block text-sm font-medium text-gray-700 mb-1">留言</label>
+                            <textarea id="message" name="message" rows="4" class="w-full border border-gray-300 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-primary-500 hover:bg-primary-600 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200">
+                            提交
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <i class="fas fa-cube text-primary-500 text-2xl mr-2"></i>
+                        <span class="text-xl font-bold">Jerry</span>
+                    </div>
+                    <p class="text-gray-400 mb-6">
+                        BIMer的AI助手，提供专业的数字孪生和BIM技术支持。
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">
+                            <i class="fab fa-weixin text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">
+                            <i class="fab fa-weibo text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-6">快速链接</h3>
+                    <ul class="space-y-3">
+                        <li><a href="#home" class="text-gray-400 hover:text-white transition-colors duration-200">首页</a></li>
+                        <li><a href="#features" class="text-gray-400 hover:text-white transition-colors duration-200">功能</a></li>
+                        <li><a href="#ai-assistant" class="text-gray-400 hover:text-white transition-colors duration-200">AI助手</a></li>
+                        <li><a href="#about" class="text-gray-400 hover:text-white transition-colors duration-200">关于我们</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-6">服务项目</h3>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">建模服务</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">投标咨询</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">BIM审查</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">渲染服务</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-6">联系方式</h3>
+                    <ul class="space-y-3">
+                        <li class="flex items-start">
+                            <i class="fas fa-envelope text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-400">contact@XXX.cn</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-phone text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-400">XXX-XXX-XXX</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-map-marker-alt text-primary-500 mt-1 mr-3"></i>
+                            <span class="text-gray-400">XXX</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8 text-center">
+                <p class="text-gray-400">© 2025 Jerry. 保留所有权利.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 功能详情模态框 -->
+    <div id="feature-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 id="modal-title" class="text-2xl font-semibold"></h3>
+                <button id="close-modal" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="p-6">
+                <!-- 动态内容将通过JavaScript填充 -->
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end">
+                <button id="modal-close-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 移动端菜单切换
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenu.classList.toggle('active');
+            });
+            
+            // 关闭移动端菜单（点击菜单项后）
+            const mobileMenuItems = mobileMenu.querySelectorAll('a');
+            mobileMenuItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    mobileMenu.classList.remove('active');
+                });
+            });
+            
+            // 滚动显示动画
+            const fadeElements = document.querySelectorAll('.fade-in');
+            
+            function checkFade() {
+                fadeElements.forEach(element => {
+                    const elementTop = element.getBoundingClientRect().top;
+                    const windowHeight = window.innerHeight;
+                    
+                    if (elementTop < windowHeight - 100) {
+                        element.classList.add('visible');
+                    }
+                });
+            }
+            
+            // 初始检查
+            checkFade();
+            
+            // 滚动时检查
+            window.addEventListener('scroll', checkFade);
+            
+            // Three.js 背景
+            initThreeBackground();
+            
+            // 3D模型展示
+            initModelViewer();
+            
+            // AI助手聊天功能
+            initChatFunctionality();
+            
+            // 功能详情模态框
+            initFeatureModal();
+            
+            // 联系表单提交
+            initContactForm();
+        });
+
+        // Three.js 背景
+        function initThreeBackground() {
+            const container = document.getElementById('three-container');
+            
+            // 创建场景
+            const scene = new THREE.Scene();
+            
+            // 创建相机
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            // 创建渲染器
+            const renderer = new THREE.WebGLRenderer({ alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 0);
+            container.appendChild(renderer.domElement);
+            
+            // 创建粒子
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 1500;
+            
+            const posArray = new Float32Array(particlesCount * 3);
+            
+            for (let i = 0; i < particlesCount * 3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 10;
+            }
+            
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            
+            // 创建材质
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: 0.02,
+                color: 0x0073f5,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            // 创建粒子系统
+            const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particlesMesh);
+            
+            // 动画
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                particlesMesh.rotation.x += 0.0005;
+                particlesMesh.rotation.y += 0.0005;
+                
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+            
+            // 响应式调整
+            window.addEventListener('resize', function() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // 3D模型展示
+        function initModelViewer() {
+            const container = document.getElementById('model-canvas');
+            
+            // 创建场景
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            
+            // 创建相机
+            const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            // 创建渲染器
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            
+            // 添加灯光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // 创建简单的建筑模型
+            const buildingGroup = new THREE.Group();
+            
+            // 主体建筑
+            const buildingGeometry = new THREE.BoxGeometry(2, 3, 2);
+            const buildingMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x0073f5,
+                transparent: true,
+                opacity: 0.8
+            });
+            const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+            building.position.y = 1.5;
+            buildingGroup.add(building);
+            
+            // 窗户
+            const windowGeometry = new THREE.PlaneGeometry(0.2, 0.4);
+            const windowMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x00c3ff,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            // 添加窗户
+            for (let i = -0.8; i <= 0.8; i += 0.4) {
+                for (let j = 0.5; j <= 2.5; j += 0.6) {
+                    // 前面窗户
+                    const frontWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+                    frontWindow.position.set(i, j, 1.01);
+                    buildingGroup.add(frontWindow);
+                    
+                    // 后面窗户
+                    const backWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+                    backWindow.position.set(i, j, -1.01);
+                    buildingGroup.add(backWindow);
+                    
+                    // 左面窗户
+                    const leftWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+                    leftWindow.rotation.y = Math.PI / 2;
+                    leftWindow.position.set(-1.01, j, i);
+                    buildingGroup.add(leftWindow);
+                    
+                    // 右面窗户
+                    const rightWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+                    rightWindow.rotation.y = Math.PI / 2;
+                    rightWindow.position.set(1.01, j, i);
+                    buildingGroup.add(rightWindow);
+                }
+            }
+            
+            // 屋顶
+            const roofGeometry = new THREE.BoxGeometry(2.2, 0.2, 2.2);
+            const roofMaterial = new THREE.MeshPhongMaterial({ color: 0x005cc4 });
+            const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+            roof.position.y = 3.1;
+            buildingGroup.add(roof);
+            
+            // 底座
+            const baseGeometry = new THREE.BoxGeometry(2.5, 0.1, 2.5);
+            const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = 0.05;
+            buildingGroup.add(base);
+            
+            scene.add(buildingGroup);
+            
+            // 添加网格
+            const gridHelper = new THREE.GridHelper(10, 10);
+            scene.add(gridHelper);
+            
+            // 添加轨道控制器
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // 动画
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                controls.update();
+                
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+            
+            // 响应式调整
+            window.addEventListener('resize', function() {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        }
+
+        // AI助手聊天功能
+        function initChatFunctionality() {
+            const chatInput = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-message');
+            const chatMessages = document.getElementById('chat-messages');
+            const quickQuestions = document.querySelectorAll('.quick-question');
+            
+            // 预设回答
+            const responses = {
+                '什么是数字孪生？': '数字孪生是指通过数字化手段创建物理实体的虚拟模型，实现物理实体与虚拟模型的实时映射和交互。在建筑领域，数字孪生可以用于建筑全生命周期管理，包括设计、施工、运营和维护等阶段。',
+                'BIM技术有哪些应用？': 'BIM（建筑信息模型）技术在建筑行业有广泛应用，包括：1. 设计阶段：三维建模、可视化设计、性能分析；2. 施工阶段：施工模拟、进度管理、成本控制；3. 运营阶段：设施管理、能耗分析、空间管理等。',
+                '如何提高建模效率？': '提高BIM建模效率的方法包括：1. 使用参数化族库；2. 建立标准化建模流程；3. 利用插件和脚本自动化重复任务；4. 采用协同建模方式；5. 定期培训提升技能等。'
+            };
+            
+            // 添加用户消息
+            function addUserMessage(message) {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'flex mb-4 justify-end chat-message';
+                messageElement.innerHTML = `
+                    <div class="mr-3 bg-gray-100 text-gray-800 rounded-lg py-2 px-4 max-w-[80%]">
+                        <p>${message}</p>
+                    </div>
+                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                        <i class="fas fa-user text-sm"></i>
+                    </div>
+                `;
+                chatMessages.appendChild(messageElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // 添加AI消息
+            function addAIMessage(message) {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'flex mb-4 chat-message';
+                messageElement.innerHTML = `
+                    <div class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                        <i class="fas fa-robot text-sm"></i>
+                    </div>
+                    <div class="ml-3 bg-primary-500 text-white rounded-lg py-2 px-4 max-w-[80%]">
+                        <p>${message}</p>
+                    </div>
+                `;
+                chatMessages.appendChild(messageElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // 添加正在输入指示器
+            function addTypingIndicator() {
+                const indicatorElement = document.createElement('div');
+                indicatorElement.id = 'typing-indicator';
+                indicatorElement.className = 'flex mb-4 chat-message';
+                indicatorElement.innerHTML = `
+                    <div class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                        <i class="fas fa-robot text-sm"></i>
+                    </div>
+                    <div class="ml-3 bg-primary-500 text-white rounded-lg py-2 px-4">
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                `;
+                chatMessages.appendChild(indicatorElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // 移除正在输入指示器
+            function removeTypingIndicator() {
+                const indicator = document.getElementById('typing-indicator');
+                if (indicator) {
+                    indicator.remove();
+                }
+            }
+            
+            // 处理用户输入
+            function handleUserInput(message) {
+                if (!message.trim()) return;
+                
+                // 添加用户消息
+                addUserMessage(message);
+                
+                // 清空输入框
+                chatInput.value = '';
+                
+                // 添加正在输入指示器
+                addTypingIndicator();
+                
+                // 模拟AI思考时间
+                setTimeout(() => {
+                    // 移除正在输入指示器
+                    removeTypingIndicator();
+                    
+                    // 添加AI回复
+                    let response = '很抱歉，我暂时无法回答这个问题。请尝试其他问题，或者联系我们的客服获取更多帮助。';
+                    
+                    // 检查是否有预设回答
+                    for (const [question, answer] of Object.entries(responses)) {
+                        if (message.includes(question) || question.includes(message)) {
+                            response = answer;
+                            break;
+                        }
+                    }
+                    
+                    addAIMessage(response);
+                }, 1000);
+            }
+            
+            // 发送按钮点击事件
+            sendButton.addEventListener('click', () => {
+                handleUserInput(chatInput.value);
+            });
+            
+            // 输入框回车事件
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleUserInput(chatInput.value);
+                }
+            });
+            
+            // 快速问题点击事件
+            quickQuestions.forEach(button => {
+                button.addEventListener('click', () => {
+                    handleUserInput(button.textContent);
+                });
+            });
+        }
+
+        // 功能详情模态框
+        function initFeatureModal() {
+            const modal = document.getElementById('feature-modal');
+            const closeModal = document.getElementById('close-modal');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const modalTitle = document.getElementById('modal-title');
+            const modalContent = document.getElementById('modal-content');
+            const featureButtons = document.querySelectorAll('.feature-detail-btn');
+            
+            // 功能详情内容
+            const featureDetails = {
+                modeling: {
+                    title: '建模助手',
+                    content: `
+                        <div class="space-y-6">
+                            <p class="text-gray-600">
+                                建模助手是一款专业的BIM建模工具，旨在提高建模效率和质量，降低建模难度。
+                            </p>
+                            
+                            <h4 class="text-xl font-semibold">核心功能</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>参数化族库创建与管理</li>
+                                <li>智能建模指导与提示</li>
+                                <li>模型质量自动检查</li>
+                                <li>建模流程标准化</li>
+                                <li>批量建模工具</li>
+                                <li>模型优化建议</li>
+                            </ul>
+                            
+                            <h4 class="text-xl font-semibold">技术特点</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>基于AI的建模辅助</li>
+                                <li>支持主流BIM软件</li>
+                                <li>云端协同建模</li>
+                                <li>实时性能分析</li>
+                                <li>自定义工作流</li>
+                            </ul>
+                            
+                            <div class="bg-primary-50 p-4 rounded-lg">
+                                <h4 class="text-lg font-semibold mb-2">应用场景</h4>
+                                <p class="text-gray-600">
+                                    适用于建筑设计、结构工程、机电安装等领域的BIM建模工作，特别适合初学者和需要提高建模效率的专业人士。
+                                </p>
+                            </div>
+                        </div>
+                    `
+                },
+                bidding: {
+                    title: '投标助手',
+                    content: `
+                        <div class="space-y-6">
+                            <p class="text-gray-600">
+                                投标助手是一款专为BIM项目投标设计的辅助工具，帮助企业提高投标成功率，展示技术实力。
+                            </p>
+                            
+                            <h4 class="text-xl font-semibold">核心功能</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>投标方案模板库</li>
+                                <li>技术亮点自动提取</li>
+                                <li>竞争对手分析</li>
+                                <li>投标策略建议</li>
+                                <li>方案可视化展示</li>
+                                <li>投标文档自动生成</li>
+                            </ul>
+                            
+                            <h4 class="text-xl font-semibold">技术特点</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>基于大数据的投标分析</li>
+                                <li>AI驱动的方案优化</li>
+                                <li>多维度竞争力评估</li>
+                                <li>历史案例智能推荐</li>
+                                <li>团队协作投标</li>
+                            </ul>
+                            
+                            <div class="bg-primary-50 p-4 rounded-lg">
+                                <h4 class="text-lg font-semibold mb-2">应用场景</h4>
+                                <p class="text-gray-600">
+                                    适用于建筑设计单位、施工企业、咨询公司等参与BIM项目投标的企业，帮助提升投标文件质量和技术展示效果。
+                                </p>
+                            </div>
+                        </div>
+                    `
+                },
+                review: {
+                    title: 'BIM审查',
+                    content: `
+                        <div class="space-y-6">
+                            <p class="text-gray-600">
+                                BIM审查工具提供全面的模型质量检查和规范符合性审查，确保模型满足项目要求和行业标准。
+                            </p>
+                            
+                            <h4 class="text-xl font-semibold">核心功能</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>模型质量自动检查</li>
+                                <li>碰撞检测与分析</li>
+                                <li>规范符合性审查</li>
+                                <li>设计合理性评估</li>
+                                <li>性能指标分析</li>
+                                <li>审查报告自动生成</li>
+                            </ul>
+                            
+                            <h4 class="text-xl font-semibold">技术特点</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>多维度审查标准</li>
+                                <li>自定义审查规则</li>
+                                <li>可视化审查结果</li>
+                                <li>问题追踪与管理</li>
+                                <li>批量审查处理</li>
+                            </ul>
+                            
+                            <div class="bg-primary-50 p-4 rounded-lg">
+                                <h4 class="text-lg font-semibold mb-2">应用场景</h4>
+                                <p class="text-gray-600">
+                                    适用于设计单位、施工企业、业主单位等在项目各阶段进行模型质量控制和设计审查，确保项目质量和合规性。
+                                </p>
+                            </div>
+                        </div>
+                    `
+                },
+                policy: {
+                    title: 'BIM政策',
+                    content: `
+                        <div class="space-y-6">
+                            <p class="text-gray-600">
+                                BIM政策平台收集整理最新的BIM政策法规、标准规范和行业动态，为项目决策提供政策依据和参考。
+                            </p>
+                            
+                            <h4 class="text-xl font-semibold">核心功能</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>政策法规数据库</li>
+                                <li>标准规范查询</li>
+                                <li>行业动态更新</li>
+                                <li>政策解读分析</li>
+                                <li>地方政策对比</li>
+                                <li>政策趋势预测</li>
+                            </ul>
+                            
+                            <h4 class="text-xl font-semibold">技术特点</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>实时政策更新</li>
+                                <li>智能检索系统</li>
+                                <li>个性化订阅</li>
+                                <li>政策地图可视化</li>
+                                <li>专家解读视频</li>
+                            </ul>
+                            
+                            <div class="bg-primary-50 p-4 rounded-lg">
+                                <h4 class="text-lg font-semibold mb-2">应用场景</h4>
+                                <p class="text-gray-600">
+                                    适用于政府部门、设计单位、施工企业、咨询公司等需要了解和应用BIM政策的机构和个人，帮助把握政策导向和行业发展趋势。
+                                </p>
+                            </div>
+                        </div>
+                    `
+                },
+                rendering: {
+                    title: 'BIM渲染',
+                    content: `
+                        <div class="space-y-6">
+                            <p class="text-gray-600">
+                                BIM渲染服务提供高质量的BIM模型可视化效果，包括静态渲染、动画制作、VR/AR展示等，实现设计可视化。
+                            </p>
+                            
+                            <h4 class="text-xl font-semibold">核心功能</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>高质量静态渲染</li>
+                                <li>建筑动画制作</li>
+                                <li>VR/AR场景创建</li>
+                                <li>光照与材质编辑</li>
+                                <li>环境效果模拟</li>
+                                <li>渲染结果优化</li>
+                            </ul>
+                            
+                            <h4 class="text-xl font-semibold">技术特点</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>云端渲染加速</li>
+                                <li>AI辅助渲染优化</li>
+                                <li>实时渲染预览</li>
+                                <li>多格式输出支持</li>
+                                <li>批量渲染处理</li>
+                            </ul>
+                            
+                            <div class="bg-primary-50 p-4 rounded-lg">
+                                <h4 class="text-lg font-semibold mb-2">应用场景</h4>
+                                <p class="text-gray-600">
+                                    适用于建筑设计展示、项目汇报、营销推广、虚拟建造等场景，帮助客户直观了解设计方案和项目效果。
+                                </p>
+                            </div>
+                        </div>
+                    `
+                },
+                twin: {
+                    title: '数字孪生',
+                    content: `
+                        <div class="space-y-6">
+                            <p class="text-gray-600">
+                                数字孪生平台将BIM模型与物联网、大数据、AI等技术结合，构建数字孪生体，实现建筑全生命周期管理。
+                            </p>
+                            
+                            <h4 class="text-xl font-semibold">核心功能</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>数字孪生体构建</li>
+                                <li>实时数据采集与分析</li>
+                                <li>智能监控与预警</li>
+                                <li>模拟仿真与优化</li>
+                                <li>远程控制与操作</li>
+                                <li>全生命周期数据管理</li>
+                            </ul>
+                            
+                            <h4 class="text-xl font-semibold">技术特点</h4>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-600">
+                                <li>多源数据融合</li>
+                                <li>AI驱动的智能分析</li>
+                                <li>可视化决策支持</li>
+                                <li>开放式API接口</li>
+                                <li>边缘计算与云计算结合</li>
+                            </ul>
+                            
+                            <div class="bg-primary-50 p-4 rounded-lg">
+                                <h4 class="text-lg font-semibold mb-2">应用场景</h4>
+                                <p class="text-gray-600">
+                                    适用于智慧城市、智能建筑、工业设施、交通枢纽等领域的数字化管理，实现资产高效运营和智能化决策。
+                                </p>
+                            </div>
+                        </div>
+                    `
+                }
+            };
+            
+            // 打开模态框
+            function openModal(feature) {
+                const detail = featureDetails[feature];
+                if (detail) {
+                    modalTitle.textContent = detail.title;
+                    modalContent.innerHTML = detail.content;
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+            
+            // 关闭模态框
+            function closeModalFunc() {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+            
+            // 功能按钮点击事件
+            featureButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const feature = button.getAttribute('data-feature');
+                    openModal(feature);
+                });
+            });
+            
+            // 关闭按钮点击事件
+            closeModal.addEventListener('click', closeModalFunc);
+            modalCloseBtn.addEventListener('click', closeModalFunc);
+            
+            // 点击模态框外部关闭
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModalFunc();
+                }
+            });
+        }
+
+        // 联系表单提交
+        function initContactForm() {
+            const contactForm = document.getElementById('contact-form');
+            
+            contactForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const name = document.getElementById('name').value;
+                const email = document.getElementById('email').value;
+                const message = document.getElementById('message').value;
+                
+                // 简单验证
+                if (!name || !email || !message) {
+                    alert('请填写所有必填字段');
+                    return;
+                }
+                
+                // 模拟表单提交
+                alert('感谢您的留言！我们会尽快回复您。');
+                
+                // 重置表单
+                contactForm.reset();
+            });
+        }
+
+        // 引入OrbitControls
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建script元素
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
+            
+            // 加载完成后初始化
+            script.onload = function() {
+                console.log('OrbitControls loaded');
+            };
+            
+            // 添加到文档
+            document.head.appendChild(script);
+        });
+    </script>
+
+
+</body></html>
